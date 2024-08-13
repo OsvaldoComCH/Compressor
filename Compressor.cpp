@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 #include <chrono>
-#include <cstring>
 #include <random>
 
 using namespace std;
@@ -12,14 +11,32 @@ int main(int argc, char ** argv)
 {
     if(argc == 1){return 1;}
     fstream File;
+
+    string Path (argv[1]);
+
     File.open(argv[1], fstream::in | fstream::out | fstream::app | fstream::binary);
     File.unsetf(fstream::skipws);
     if(File.fail()){return 1;}
     std::minstd_rand RNG (std::chrono::system_clock::now().time_since_epoch().count());
-    if(argc > 2 && !std::strcmp(argv[2], "-d"))
+
+    if(Path.substr(Path.size() - 4, 4) == ".cmp")
     {
-        std::cout << "-d\n";
+        vector<char> Buffer ((istreambuf_iterator<char>(File)), (istreambuf_iterator<char>()));
         File.close();
+
+        long long Key = 0;
+
+        RNG = minstd_rand((Key ^ (Key >> 32)) & 0xffffffff);
+
+        for(int i = 0; i < Buffer.size() - 8; ++i)
+        {
+            Buffer[i] ^= RNG() ^ (Key >> RNG() % 57);
+        }
+
+        for(int i = 0; i < Buffer.size(); ++i)
+        {
+            std::cout << Buffer[i];
+        }
     }else
     {
         vector<char> Buffer ((istreambuf_iterator<char>(File)), (istreambuf_iterator<char>()));
@@ -32,12 +49,26 @@ int main(int argc, char ** argv)
 
         Key ^= ((long long)RNG() << 32) | RNG();
 
-        std::cout << Key << "\n\n";
+        RNG = minstd_rand((Key ^ (Key >> 32)) & 0xffffffff);
 
-        for(int i = 0; i < Buffer.size() - 1; ++i)
+        for(int i = 0; i < Buffer.size(); ++i)
         {
-            Buffer[i] ^= Buffer[i+1];
+            Buffer[i] ^= RNG() ^ (Key >> RNG() % 57);
         }
+
+        int Swaps = Key % Buffer.size();
+
+        RNG = minstd_rand((Key & (Key >> 8) | (Key >> 16) ^ (Key >> 24) ^ 0x55555555) & 0xffffffff);
+
+        for(int i = 0; i < Swaps; ++i)
+        {
+            unsigned x = RNG() % Buffer.size();
+            unsigned y = RNG() % Buffer.size();
+            char Temp = Buffer[x];
+            Buffer[x] = Buffer[y];
+            Buffer[y] = Temp;
+        }
+
         Buffer.push_back((char)(Key >> 56));
         Buffer.push_back((char)(Key >> 48));
         Buffer.push_back((char)(Key >> 40));
@@ -46,20 +77,13 @@ int main(int argc, char ** argv)
         Buffer.push_back((char)(Key >> 16));
         Buffer.push_back((char)(Key >> 8));
         Buffer.push_back((char)(Key));
-        
-        for(int i = 0; i < Buffer.size(); ++i)
-        {
-            std::cout << Buffer[i];
-        }
 
-        std::cout << "\n\n";
-        for(int i = Buffer.size() - 10; i >= 0; --i)
-        {
-            Buffer[i] ^= Buffer[i+1];
-        }
-        for(int i = 0; i < Buffer.size(); ++i)
-        {
-            std::cout << Buffer[i];
-        }
+        Path.append(".cmp");
+        std::cout << Path;
+        File.open(Path, fstream::trunc | fstream::out | fstream::binary);
+
+        File.write(Buffer.data(), Buffer.size());
+
+        File.close();
     }
 }
