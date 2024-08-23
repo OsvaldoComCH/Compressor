@@ -11,6 +11,50 @@ g++ compressor.cpp -o Compressor.exe -O2 -static-libgcc -static-libstdc++
 
 using namespace std;
 
+void PlaceKey(std::vector<unsigned char> * Buffer, long long Key)
+{
+    Buffer->push_back((char)(Key));
+    Buffer->push_back((char)(Key >> 48));
+    Buffer->push_back((char)(Key >> 8));
+    Buffer->push_back((char)(Key >> 40));
+    Buffer->push_back((char)(Key >> 24));
+    Buffer->push_back((char)(Key >> 56));
+    Buffer->push_back((char)(Key >> 16));
+    Buffer->push_back((char)(Key >> 32));
+}
+
+long long ExtractKey(std::vector<unsigned char> * Buffer)
+{
+    long long Key = 0;
+    Key |= (((unsigned long long)Buffer->back()) << 32);
+    Buffer->pop_back();
+    Key |= (((unsigned long long)Buffer->back()) << 16);
+    Buffer->pop_back();
+    Key |= (((unsigned long long)Buffer->back()) << 56);
+    Buffer->pop_back();
+    Key |= (((unsigned long long)Buffer->back()) << 24);
+    Buffer->pop_back();
+    Key |= (((unsigned long long)Buffer->back()) << 40);
+    Buffer->pop_back();
+    Key |= (((unsigned long long)Buffer->back()) << 8);
+    Buffer->pop_back();
+    Key |= (((unsigned long long)Buffer->back()) << 48);
+    Buffer->pop_back();
+    Key |= (((unsigned long long)Buffer->back()));
+    Buffer->pop_back();
+    return Key;
+}
+
+void Encryption(std::vector<unsigned char> * Buffer, long long Key)
+{
+    std::minstd_rand RNG ((Key ^ (Key >> 32)) & 0xffffffff);
+
+    for(int i = 0; i < Buffer->size(); ++i)
+    {
+        *Buffer[i] ^= RNG() ^ (Key >> RNG() % 57);
+    }
+}
+
 int main(int argc, char ** argv)
 {
     if(argc == 1){return 1;}
@@ -45,8 +89,6 @@ int main(int argc, char ** argv)
         Buffer.pop_back();
         Key |= (((unsigned long long)Buffer.back()) << 56);
         Buffer.pop_back();
-
-        printf("%llx\n", Key);
 
         RNG = minstd_rand((Key ^ (Key >> 32)) & 0xffffffff);
 
@@ -104,9 +146,8 @@ int main(int argc, char ** argv)
         Buffer.push_back((char)(Key >> 8));
         Buffer.push_back((char)(Key));
 
-        printf("%llx\n", Key);
-
         Path.append(".cmp");
+
         std::cout << Path;
         File.open(Path, fstream::trunc | fstream::out | fstream::binary);
 
